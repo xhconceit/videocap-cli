@@ -1,0 +1,10 @@
+{
+  "name": "videocap-cli",
+  "version": "1.0.0",
+  "description": "A CLI tool for automatically generating subtitles from video audio using speech recognition",
+  "keywords": ["video", "subtitle", "speech-recognition", "cli", "transcription", "captions"],
+  "main": "dist/index.js",
+  "bin": {
+    "videocap": "dist/cli.js"
+  }
+}
