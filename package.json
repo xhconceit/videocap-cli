@@ -2,9 +2,34 @@
   "name": "videocap-cli",
   "version": "1.0.0",
   "description": "A CLI tool for automatically generating subtitles from video audio using speech recognition",
-  "keywords": ["video", "subtitle", "speech-recognition", "cli", "transcription", "captions"],
+  "type": "module",
+  "keywords": [
+    "video",
+    "subtitle",
+    "speech-recognition",
+    "cli",
+    "transcription",
+    "captions"
+  ],
   "main": "dist/index.js",
   "bin": {
     "videocap": "dist/cli.js"
+  },
+  "scripts": {
+    "format": "prettier --write .",
+    "lint": "eslint --cache .",
+    "typecheck": "tsc --noEmit",
+    "build": "pnpm run lint && rolldown -c rolldown.config.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.30.1",
+    "eslint": "^9.30.1",
+    "eslint-config-prettier": "^10.1.5",
+    "eslint-plugin-prettier": "^5.5.1",
+    "globals": "^16.3.0",
+    "prettier": "^3.6.2",
+    "rolldown": "1.0.0-beta.24",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.36.0"
   }
 }
