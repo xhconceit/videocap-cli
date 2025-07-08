@@ -16,5 +16,5 @@
     "noImplicitAny": false,
     "noImplicitReturns": true
   },
-  "include": ["src", "rolldown.config.ts"]
+  "include": ["src", "rolldown.config.ts", "@types/node"]
 }
