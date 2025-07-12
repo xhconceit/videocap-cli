@@ -14,7 +14,8 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitAny": false,
-    "noImplicitReturns": true
+    "noImplicitReturns": true,
+    "types": ["node"]
   },
   "include": ["src", "rolldown.config.ts", "@types/node"]
 }

@@ -9,5 +9,7 @@ export default defineConfig({
       chunkFileNames: 'chunks/lib-[hash].js',
       format: 'es'
     }
-  ]
+  ],
+  platform: 'node',
+  external: ['events', 'fs', 'path', 'util', 'url', 'child_process', 'stream', 'crypto']
 })
