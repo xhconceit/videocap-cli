@@ -9,8 +9,14 @@ export const getFileAbsolutePath = (url: string): string => {
   return path.resolve(process.cwd(), url)
 }
 
-
 export const isVideoFile = async (url: string): Promise<boolean> => {
   const fileType = await fileTypeFromBuffer(fs.readFileSync(url))
   return fileType?.mime.startsWith('video/') ?? false
+}
+
+
+export const ensureDirectoryExists = (dirPath: string): void => {
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true })
+  }
 }

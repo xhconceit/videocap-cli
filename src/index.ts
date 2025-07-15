@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import { isVideoFile } from './utils'
-import { isFFmpegInstalled } from './ffmpeg'
+import { execFFmeg, extractAudioFromVideo, isFFmpegInstalled } from './ffmpeg'
 
 export interface VideoCapOptions {
   input: string
@@ -14,7 +14,7 @@ export interface VideoCapOptions {
   cc?: boolean
 }
 
-export const videoCap = async (options: VideoCapOptions) => {
+export const videoCap = async (options: VideoCapOptions): Promise<void> => {
   if (!fs.existsSync(options.input)) {
     console.error('Input file does not exist.')
     process.exit(1)
@@ -27,5 +27,5 @@ export const videoCap = async (options: VideoCapOptions) => {
     console.error('Input file is not a video file.')
     process.exit(1)
   }
-
+  await extractAudioFromVideo(options.input, options.output)
 }
