@@ -26,12 +26,42 @@ export const isFFmpegInstalled = async (): Promise<boolean> => {
   return isInstalled
 }
 
+export const getMediaInfo = async (input: string): Promise<FFmpegMediaInfo> => {
+  return new Promise((resolve, reject) => {
+    const ffmpeg = spawn('ffmpeg', ['-i', input])
+
+    let stderr = ''
+
+    ffmpeg.stderr.on('data', data => {
+      stderr += data.toString()
+    })
+
+    ffmpeg.on('close', code => {
+      console.log(code)
+      console.log(stderr.includes('Error'))
+      // if (code === 0) {
+      //   resolve(stderr)
+      // } else {
+      //   reject(new Error(`FFmpeg exited with code ${code}: ${stderr}`))
+      // }
+    })
+
+    ffmpeg.on('error', err => {
+      console.log('error', err)
+      reject(err)
+    })
+  })
+}
+
 export const extractAudioFromVideo = async (input: string, output: string): Promise<void> => {
   const name = path.basename(input)
   ensureDirectoryExists(tempDir)
 
   // ✅ 改为 WAV 格式，适合 Whisper
   const audioPath = path.join(tempDir, `${name}-${Date.now()}.wav`)
+
+  await getMediaInfo(input)
+  return
 
   // ✅ 使用适合的编码参数
   const command = [
@@ -51,8 +81,16 @@ export const extractAudioFromVideo = async (input: string, output: string): Prom
   await execFFmeg(command)
 }
 
-export interface FFmpegOptions {}
-export const execFFmeg = async (args: string[], options: FFmpegOptions = {}): Promise<number> => {
+export interface FFmpegOptions {
+  onProgress?: (progress: string) => void
+  onError?: (error: string) => void
+}
+export interface FFmpegResult {
+  stdout: string
+  stderr: string
+  code: number
+}
+export const execFFmeg = async (args: string[], options: FFmpegOptions = {}): Promise<FFmpegResult> => {
   return new Promise((resolve, reject) => {
     // 添加进度报告参数
     const enhancedArgs = [
@@ -62,18 +100,36 @@ export const execFFmeg = async (args: string[], options: FFmpegOptions = {}): Pr
       '-nostats' // 不输出统计信息到 stderr
     ]
 
+    console.log('execFFmeg', enhancedArgs)
     const ffmpeg = spawn('ffmpeg', enhancedArgs)
 
     let progressBuffer = ''
     let errorBuffer = ''
 
-    ffmpeg.stdout.on('data', data => {})
+    ffmpeg.stdout.on('data', data => {
+      progressBuffer += data.toString()
+      options.onProgress?.(progressBuffer)
+    })
 
-    // 监听错误输出 (stderr)
-    ffmpeg.stderr.on('data', data => {})
+    ffmpeg.stderr.on('data', data => {
+      errorBuffer += data.toString()
+      options.onError?.(errorBuffer)
+    })
 
-    ffmpeg.on('close', code => {})
-
-    ffmpeg.on('error', err => {})
+    ffmpeg.on('close', code => {
+      console.log('close', code)
+      if (code === 0) {
+        resolve({
+          stdout: progressBuffer,
+          stderr: errorBuffer,
+          code
+        })
+      } else {
+        reject(new Error(`FFmpeg exited with code ${code}: ${errorBuffer}`))
+      }
+    })
+    ffmpeg.on('error', err => {
+      reject(err)
+    })
   })
 }
