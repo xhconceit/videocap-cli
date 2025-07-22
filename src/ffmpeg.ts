@@ -7,6 +7,7 @@ import { ensureDirectoryExists } from './utils'
 const tempDir = path.join(os.tmpdir(), 'videocap-cli')
 
 export interface FFmpegMediaInfo {
+  version: string
   duration: number
   size: number
   bitrate: string
@@ -29,21 +30,17 @@ export const isFFmpegInstalled = async (): Promise<boolean> => {
 export const getMediaInfo = async (input: string): Promise<FFmpegMediaInfo> => {
   return new Promise((resolve, reject) => {
     const ffmpeg = spawn('ffmpeg', ['-i', input])
-
     let stderr = ''
-
     ffmpeg.stderr.on('data', data => {
       stderr += data.toString()
     })
 
     ffmpeg.on('close', code => {
-      console.log(code)
-      console.log(stderr.includes('Error'))
-      // if (code === 0) {
-      //   resolve(stderr)
-      // } else {
-      //   reject(new Error(`FFmpeg exited with code ${code}: ${stderr}`))
-      // }
+      if (stderr.includes('Error')) {
+        reject(new Error(`FFmpeg exited with code ${code}: ${stderr}`))
+      } else {
+        resolve(parseMediaInfo(stderr))
+      }
     })
 
     ffmpeg.on('error', err => {
@@ -51,6 +48,34 @@ export const getMediaInfo = async (input: string): Promise<FFmpegMediaInfo> => {
       reject(err)
     })
   })
+}
+
+export const parseMediaInfo = (info: string): FFmpegMediaInfo => {
+  const mediaInfo: FFmpegMediaInfo = {
+    duration: 0,
+    size: 0
+  } as FFmpegMediaInfo
+
+  const lines = info.split('\n')
+
+  while (lines.length > 0) {
+    const line = lines.shift()?.trim()
+    console.log(line)
+    console.log('--------------------------------')
+    try {
+      if (line) {
+        if (line.startsWith('ffmpeg version ')) {
+          const version = line.split('ffmpeg version ')[1].split(' ')[0]
+          mediaInfo.version = version || ''
+        } else if (line.startsWith('Input #0')) {
+        }
+      }
+    } catch (e) {
+      console.log('parseMediaInfo error', e)
+    }
+  }
+
+  return mediaInfo
 }
 
 export const extractAudioFromVideo = async (input: string, output: string): Promise<void> => {
