@@ -50,60 +50,17 @@ export const getMediaInfo = async (input: string): Promise<FFmpegMediaInfo> => {
   })
 }
 
-export const parseMediaInfo = (info: string): FFmpegMediaInfo => {
-  const mediaInfo: FFmpegMediaInfo = {
-    duration: 0,
-    size: 0
-  } as FFmpegMediaInfo
-
-  const lines = info.split('\n')
-
-  while (lines.length > 0) {
-    const line = lines.shift()?.trim()
-    console.log(line)
-    console.log('--------------------------------')
-    try {
-      if (line) {
-        if (line.startsWith('ffmpeg version ')) {
-          const version = line.split('ffmpeg version ')[1].split(' ')[0]
-          mediaInfo.version = version || ''
-        } else if (line.startsWith('Input #0')) {
-        }
-      }
-    } catch (e) {
-      console.log('parseMediaInfo error', e)
-    }
-  }
-
-  return mediaInfo
-}
-
-export const extractAudioFromVideo = async (input: string, output: string): Promise<void> => {
+export const extractAudioFromVideo = async (input: string): Promise<void> => {
   const name = path.basename(input)
   ensureDirectoryExists(tempDir)
-
-  // ✅ 改为 WAV 格式，适合 Whisper
   const audioPath = path.join(tempDir, `${name}-${Date.now()}.wav`)
-
-  await getMediaInfo(input)
-  return
-
-  // ✅ 使用适合的编码参数
-  const command = [
-    '-i',
-    input,
-    '-vn', // 不包含视频
-    '-acodec',
-    'pcm_s16le', // PCM 编码（无损）
-    '-ar',
-    '16000', // 16kHz（Whisper 推荐）
-    '-ac',
-    '1', // 单声道
-    '-y', // 覆盖现有文件
-    audioPath
-  ]
-
-  await execFFmeg(command)
+  const command = ['-i', input, '-vn', '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1', '-y', audioPath]
+  await execFFmeg(command, {
+    onProgress: progress => {
+      console.log('--------------------------------')
+      console.log('progress', progress)
+    }
+  })
 }
 
 export interface FFmpegOptions {
@@ -125,13 +82,12 @@ export const execFFmeg = async (args: string[], options: FFmpegOptions = {}): Pr
       '-nostats' // 不输出统计信息到 stderr
     ]
 
-    console.log('execFFmeg', enhancedArgs)
     const ffmpeg = spawn('ffmpeg', enhancedArgs)
-
     let progressBuffer = ''
     let errorBuffer = ''
 
     ffmpeg.stdout.on('data', data => {
+      // TODO: parse progress to json
       progressBuffer += data.toString()
       options.onProgress?.(progressBuffer)
     })
@@ -142,7 +98,6 @@ export const execFFmeg = async (args: string[], options: FFmpegOptions = {}): Pr
     })
 
     ffmpeg.on('close', code => {
-      console.log('close', code)
       if (code === 0) {
         resolve({
           stdout: progressBuffer,
