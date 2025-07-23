@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import { isVideoFile } from './utils'
 import { extractAudioFromVideo, isFFmpegInstalled } from './ffmpeg'
+import { extractSubtitlesFromAudio } from './whisper'
 
 export interface VideoCapOptions {
   input: string
@@ -27,5 +28,7 @@ export const videoCap = async (options: VideoCapOptions): Promise<void> => {
     console.error('Input file is not a video file.')
     process.exit(1)
   }
-  await extractAudioFromVideo(options.input)
+  const audioPaht = await extractAudioFromVideo(options.input)
+  const sub = await extractSubtitlesFromAudio(audioPaht)
+  console.log(sub)
 }

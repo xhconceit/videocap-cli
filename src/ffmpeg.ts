@@ -2,69 +2,32 @@ import commandExists from 'command-exists'
 import path from 'node:path'
 import os from 'node:os'
 import { spawn } from 'node:child_process'
-import { ensureDirectoryExists } from './utils'
-
+import { ensureDirectoryExists, snakeToCamel } from './utils'
+import yoctoSpinner from 'yocto-spinner'
 const tempDir = path.join(os.tmpdir(), 'videocap-cli')
-
-export interface FFmpegMediaInfo {
-  version: string
-  duration: number
-  size: number
-  bitrate: string
-  width: number
-  height: number
-  fps: number
-  videoCodec: string
-  audioCodec: string
-  sampleRate: number
-  channels: number
-  format: string
-  bitDepth: number
-}
 
 export const isFFmpegInstalled = async (): Promise<boolean> => {
   const isInstalled = commandExists.sync('ffmpeg')
   return isInstalled
 }
 
-export const getMediaInfo = async (input: string): Promise<FFmpegMediaInfo> => {
-  return new Promise((resolve, reject) => {
-    const ffmpeg = spawn('ffmpeg', ['-i', input])
-    let stderr = ''
-    ffmpeg.stderr.on('data', data => {
-      stderr += data.toString()
-    })
-
-    ffmpeg.on('close', code => {
-      if (stderr.includes('Error')) {
-        reject(new Error(`FFmpeg exited with code ${code}: ${stderr}`))
-      } else {
-        resolve(parseMediaInfo(stderr))
-      }
-    })
-
-    ffmpeg.on('error', err => {
-      console.log('error', err)
-      reject(err)
-    })
-  })
-}
-
-export const extractAudioFromVideo = async (input: string): Promise<void> => {
+export const extractAudioFromVideo = async (input: string): Promise<string> => {
   const name = path.basename(input)
   ensureDirectoryExists(tempDir)
   const audioPath = path.join(tempDir, `${name}-${Date.now()}.wav`)
   const command = ['-i', input, '-vn', '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1', '-y', audioPath]
   await execFFmeg(command, {
-    onProgress: progress => {
-      console.log('--------------------------------')
-      console.log('progress', progress)
-    }
+    enableProgress: true,
+    progressText: 'Extracting audio...'
   })
+  return audioPath
 }
 
+
 export interface FFmpegOptions {
-  onProgress?: (progress: string) => void
+  enableProgress?: boolean // 是否启用进度显示
+  progressText?: string // 进度显示文本
+  onProgress?: (progress: FFmpegProgress) => void
   onError?: (error: string) => void
 }
 export interface FFmpegResult {
@@ -73,6 +36,8 @@ export interface FFmpegResult {
   code: number
 }
 export const execFFmeg = async (args: string[], options: FFmpegOptions = {}): Promise<FFmpegResult> => {
+  const progressText = options?.progressText || 'Processing'
+  const spinner = options.enableProgress ? yoctoSpinner({ text: progressText })?.start() : null
   return new Promise((resolve, reject) => {
     // 添加进度报告参数
     const enhancedArgs = [
@@ -83,13 +48,14 @@ export const execFFmeg = async (args: string[], options: FFmpegOptions = {}): Pr
     ]
 
     const ffmpeg = spawn('ffmpeg', enhancedArgs)
-    let progressBuffer = ''
     let errorBuffer = ''
 
     ffmpeg.stdout.on('data', data => {
-      // TODO: parse progress to json
-      progressBuffer += data.toString()
-      options.onProgress?.(progressBuffer)
+      try {
+        options.onProgress?.(parseProgress(data.toString()))
+      } catch (error) {
+        console.error('parse progress error', error)
+      }
     })
 
     ffmpeg.stderr.on('data', data => {
@@ -99,17 +65,64 @@ export const execFFmeg = async (args: string[], options: FFmpegOptions = {}): Pr
 
     ffmpeg.on('close', code => {
       if (code === 0) {
+        spinner?.success('Success')
         resolve({
-          stdout: progressBuffer,
+          stdout: '',
           stderr: errorBuffer,
           code
         })
       } else {
+        spinner?.error('Error')
         reject(new Error(`FFmpeg exited with code ${code}: ${errorBuffer}`))
       }
     })
     ffmpeg.on('error', err => {
+      spinner?.error('Error')
       reject(err)
     })
   })
+}
+
+interface FFmpegProgress {
+  bitrate: number
+  totalSize: number
+  outTimeUs: number
+  outTimeMs: number
+  dupFrames: number
+  dropFrames: number
+  speed: number
+  outTime: string
+  progress: string
+}
+
+function parseProgress(progress: string): FFmpegProgress {
+  const progressData = {} as FFmpegProgress
+  const lines = progress.split('\n')
+  while (lines.length > 0) {
+    const line = lines.shift()?.trim()
+    if (line) {
+      let [key, value] = line.split('=') as [keyof FFmpegProgress, string | number]
+      if (typeof key !== 'undefined' && typeof value !== 'undefined') {
+        key = snakeToCamel(key) as keyof FFmpegProgress
+        switch (key) {
+          case 'bitrate':
+          case 'totalSize':
+          case 'outTimeUs':
+          case 'outTimeMs':
+          case 'dupFrames':
+          case 'dropFrames':
+          case 'speed':
+            value = parseFloat(value.toString())
+            progressData[key] = value
+            break
+          case 'outTime':
+          case 'progress':
+            value = value.toString()
+            progressData[key] = value
+            break
+        }
+      }
+    }
+  }
+  return progressData
 }
