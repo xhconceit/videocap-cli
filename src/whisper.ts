@@ -1,41 +1,41 @@
-import { nodewhisper } from 'nodejs-whisper'
+// import { nodewhisper } from 'nodejs-whisper'
 import { join } from 'node:path'
 import fs from 'node:fs'
+import { homedir } from 'node:os'
+import yoctoSpinner from 'yocto-spinner'
 
-// whisper 相关路径配置
-export const whisperPaths = {
-  // 模型目录路径
-  modelsDir: join(__dirname, '../node_modules/nodejs-whisper/dist/cpp/whisper.cpp/models'),
-  // 下载脚本路径
-  downloadScript: join(__dirname, '../node_modules/nodejs-whisper/download-ggml-model.sh')
-}
+const MODEL_DIR_PATH = join(homedir(), '.videocap')
+const WHISPER_DIR_PATH = join(MODEL_DIR_PATH, 'whisper')
+const WHISPER_MODEL_DIR_PATH = join(WHISPER_DIR_PATH, 'models')
+
+const WhisperDownloadModelBashUrl =
+  'https://raw.githubusercontent.com/ggerganov/whisper.cpp/master/models/download-ggml-model.sh'
+const WhisperDownloadModelBashPath = join(WHISPER_DIR_PATH, 'download-ggml-model.sh')
 
 // 确保 whisper 目录存在
-export const ensureWhisperDirs = () => {
-  if (!fs.existsSync(whisperPaths.modelsDir)) {
-    fs.mkdirSync(whisperPaths.modelsDir, { recursive: true })
+export const ensureWhisperDirs = (): void => {
+  if (!fs.existsSync(WHISPER_DIR_PATH)) {
+    fs.mkdirSync(WHISPER_DIR_PATH, { recursive: true })
   }
 }
 
 // 下载模型
-export const downloadWhisperModel = async (modelName: string = 'base.en') => {
+export const downloadWhisperModel = async (modelName: string = 'base.en'): Promise<boolean> => {
   ensureWhisperDirs()
-
-  // 如果下载脚本不存在，从官方仓库下载
-  if (!fs.existsSync(whisperPaths.downloadScript)) {
-    const response = await fetch(
-      'https://raw.githubusercontent.com/ggerganov/whisper.cpp/master/models/download-ggml-model.sh'
-    )
+  if (!fs.existsSync(WhisperDownloadModelBashPath)) {
+    const spinner = yoctoSpinner({ text: 'Downloading whisper model bash file...' }).start()
+    const response = await fetch(WhisperDownloadModelBashUrl)
     const script = await response.text()
-    fs.writeFileSync(whisperPaths.downloadScript, script)
-    fs.chmodSync(whisperPaths.downloadScript, '755') // 添加执行权限
+    spinner.success('Download whisper model bash file success')
+    fs.writeFileSync(WhisperDownloadModelBashPath, script)
+    fs.chmodSync(WhisperDownloadModelBashPath, '755')
   }
 
   // 执行下载脚本
   const { spawn } = await import('node:child_process')
   return new Promise((resolve, reject) => {
-    const process = spawn(whisperPaths.downloadScript, [modelName], {
-      cwd: whisperPaths.modelsDir
+    const process = spawn(WhisperDownloadModelBashPath, [modelName], {
+      cwd: WHISPER_MODEL_DIR_PATH
     })
 
     process.on('close', code => {
@@ -51,6 +51,8 @@ export const downloadWhisperModel = async (modelName: string = 'base.en') => {
 }
 
 export const extractSubtitlesFromAudio = async (input: string): Promise<string> => {
+  await downloadWhisperModel()
+  return ''
   const data = await nodewhisper(input, {
     modelName: 'base.en', //Downloaded models name
     autoDownloadModelName: 'base.en', // (optional) auto download a model if model is not present

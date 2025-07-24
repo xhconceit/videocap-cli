@@ -23,7 +23,6 @@ export const extractAudioFromVideo = async (input: string): Promise<string> => {
   return audioPath
 }
 
-
 export interface FFmpegOptions {
   enableProgress?: boolean // 是否启用进度显示
   progressText?: string // 进度显示文本
